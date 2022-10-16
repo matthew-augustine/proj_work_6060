@@ -1,0 +1,251 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+# Load the libraries
+```{r}
+library(readr)
+library(ggplot2)
+suppressPackageStartupMessages(library(dplyr))
+library(forcats)
+library(reshape2)
+
+```
+
+
+# Reading the data & cleaning data
+
+```{r}
+# reading data from the csv files
+team_record_df <-
+  read_csv("Team Records.csv", show_col_types = FALSE)
+# reading data of the statistics
+cfbstats_df <- read_csv("cfbstats.csv", show_col_types = FALSE)
+# reading data of the stat mapping
+stat_mapping_df <-
+  read_csv("Stat Mapping.csv", show_col_types = FALSE)
+
+
+# Data Cleaning
+# remove unwanted columns from the data
+team_record_df <- team_record_df %>%
+  select(-expectedWins) %>%
+  select(-total.games) %>%
+  select(-total.ties) %>%
+  select(-conferenceGames.games) %>%
+  select(-conferenceGames.wins) %>%
+  select(-conferenceGames.losses) %>%
+  select(-conferenceGames.ties) %>%
+  select(-homeGames.games) %>%
+  select(-homeGames.ties) %>%
+  select(-awayGames.games) %>%
+  select(-awayGames.ties)
+
+
+# data cleaning of team_record_df
+team_record_df <-  team_record_df %>%
+  mutate(year = as.factor(year)) %>%
+  mutate(team = as.factor(team)) %>%
+  mutate(conference = as.factor(conference)) %>%
+  mutate(total.wins = as.integer(total.wins)) %>%
+  mutate(total.losses = as.integer(total.losses)) %>%
+  mutate(homeGames.wins = as.integer(homeGames.wins)) %>%
+  mutate(homeGames.losses = as.integer(homeGames.losses)) %>%
+  mutate(awayGames.wins = as.integer(awayGames.wins)) %>%
+  mutate(awayGames.losses = as.integer(awayGames.losses))
+
+
+# data cleaning of cfbstats_df
+cfbstats_df <- cfbstats_df %>%
+  mutate(season = as.factor(season)) %>%
+  mutate(team = as.factor(team)) %>%
+  mutate(statName = as.factor(statName)) %>%
+  mutate(conference = as.factor(conference))
+
+# data cleaning of Stat Mapping
+stat_mapping_df <- stat_mapping_df %>%
+  mutate(statName = as.factor(statName)) %>%
+  mutate(OffenseDefenseSpTeams = as.factor(OffenseDefenseSpTeams)) %>%
+  mutate(positivenegative = as.factor(positivenegative))
+
+
+
+# Create a mapping between team_record and cfbstats table through a
+# customized lookup value
+
+# Construct a lookup column - which is combination of year and team name
+# from team_record_df
+# Example: '2021 Michigan'
+team_record_df <- team_record_df %>%
+  mutate(cfb_lookup = paste(team_record_df$year,  team_record_df$team))
+
+# Construct a lookup column - which is combination of season and team value
+# from cfbstats_df
+# Example: '2021 Michigan'
+cfbstats_df <- cfbstats_df %>%
+  mutate(cfb_lookup = paste(cfbstats_df$season, cfbstats_df$team))
+
+# Merge the data frames based on cfb_lookup values
+merge_team_cfb <-
+  merge(cfbstats_df, team_record_df, by = "cfb_lookup")
+
+
+# Now merge merge_team_cfb and stat_mapping_df
+# This final data would be used for further processing
+# Merge the data frames based on statName values
+final_merged_df <-
+  merge(merge_team_cfb, stat_mapping_df, by = "statName")
+
+
+write_csv(final_merged_df, "temp2.csv")
+
+# Splitting of the dataframe to smaller lists
+
+# split the data to a list of dataframes - based on statName
+list_by_statName <- split(final_merged_df, final_merged_df$statName)
+
+
+
+
+
+
+# ******************************************************************************
+# Function: append_list
+#
+# Purpose: The purpose of the function is to
+#          extract each dataframe from the list and
+#          sort the data based on statValue
+#          Create a column in the dataframe - RankVal and assign the ranking values
+#
+# Input : list_by_statName_year_b (list of dataframes)
+#
+# Output: Returns the list of modified dataframes
+# ******************************************************************************
+
+# Creating a function which creates a column RankVal
+# and append to the whole_list_df
+append_list <- function(list_by_statName_year_b) {
+  # Assign Rank Values for each year
+  # based on the descending order of statValues
+  for (inner_loop_idx in 1:length(list_by_statName_year_b)) {
+    list_by_statName_year_b[[inner_loop_idx]] <-
+      list_by_statName_year_b[[inner_loop_idx]] %>%
+      mutate(RankVal =
+               rank(desc(list_by_statName_year_b[[inner_loop_idx]]$statValue))) %>%
+      arrange(RankVal)
+  }
+  
+  return (list_by_statName_year_b)
+}
+
+# Create an empty list to collect all processed data
+whole_list_df <- list()
+
+# Create a loop - which goes through all entries in list based on statName
+for (outer_loop_idx in 1:length(list_by_statName)) {
+  # Since the list contains data for many years(2017-2021)
+  # split the list further based on year
+  list_by_statName_year_a <-
+    split(list_by_statName[[outer_loop_idx]],
+          list_by_statName[[outer_loop_idx]]$year)
+  
+  # Collect the return value from the function to a temporary list
+  temp_list <- append_list(list_by_statName_year_a)
+  
+  # Collect the data from the list returned from the function 
+  whole_list_df[[length(whole_list_df) + 1]] <- temp_list[[1]]
+  whole_list_df[[length(whole_list_df) + 1]] <- temp_list[[2]]
+  whole_list_df[[length(whole_list_df) + 1]] <- temp_list[[3]]
+  whole_list_df[[length(whole_list_df) + 1]] <- temp_list[[4]]
+  whole_list_df[[length(whole_list_df) + 1]] <- temp_list[[5]]
+  
+}
+
+```
+
+
+
+# Filtered Data According to Conference
+```{r}
+
+# Select only the five conferences that we are interested in
+final_merged_conf_df <-
+  filter(
+    final_merged_df,
+    conference.x == "Big Ten" |
+      conference.x == "Big 12" |
+      conference.x == "ACC" |
+      conference.x == "Pac-12" |
+      conference.x == "SEC"
+  )
+# select the years that we are interested in 
+# discard the year 2020 - since there is inconsistency in the number 
+# of games played by each team
+final_merged_conf_df <-
+  filter(
+    final_merged_conf_df,
+    season == "2017" |
+      season == "2018" |
+      season == "2019" |
+      season == "2021"
+  )
+# split the refined dataframe according to the conferences
+conference_df_sorted_list <-
+  split(final_merged_conf_df, final_merged_conf_df$conference.x)
+
+# Save the list to separate conference dataframes for plotting.
+ACC_data_frame <- as.data.frame(conference_df_sorted_list["ACC"])
+Big_10_data_frame <-
+  as.data.frame(conference_df_sorted_list["Big Ten"])
+Big_12_data_frame <-
+  as.data.frame(conference_df_sorted_list["Big 12"])
+Pac_12_data_frame <-
+  as.data.frame(conference_df_sorted_list["Pac-12"])
+SEC_data_frame <- as.data.frame(conference_df_sorted_list["SEC"])
+
+```
+
+
+
+# Analysis of Big 10
+
+Big 10 is strong in the defense and here in this section we are trying to prove
+that over the years - they are strong in defense. 
+
+```{r}
+
+# prepare the required data for plotting the data
+plot_data <- Big_10_data_frame
+
+# Since Big-10 is strong in the defense- we select the data that is 
+# defense and positive from Big-10 conference.
+plot_data <- filter(
+  Big_10_data_frame,
+  Big.Ten.OffenseDefenseSpTeams == "Defense" &
+    Big.Ten.positivenegative == "positive"
+)
+
+# Now group the data according to team to get the summary statistics
+# and prepare the summarized data
+# Collect the mean/average of the statValue
+# arranged by team name over the years.
+plot_data <- plot_data %>%
+  group_by(Big.Ten.team.x) %>%
+  summarise(Avg_Stat_Val = mean(Big.Ten.statValue))
+
+
+# perform plotting of the data into a horizontal column chart
+# colored by team name.
+# Arranged by top scoring team at the top
+plot_data  %>%  mutate(Big.Ten.team.x = fct_reorder(Big.Ten.team.x, Avg_Stat_Val)) %>% 
+ggplot( aes(y = Big.Ten.team.x, x = Avg_Stat_Val, fill = Big.Ten.team.x)) +
+  geom_col()
+
+
+```
+
