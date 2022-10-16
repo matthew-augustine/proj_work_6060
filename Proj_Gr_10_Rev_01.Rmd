@@ -212,17 +212,21 @@ SEC_data_frame <- as.data.frame(conference_df_sorted_list["SEC"])
 
 
 
+
+
 # Analysis of Big 10
 
 Big 10 is strong in the defense and here in this section we are trying to prove
-that over the years - they are strong in defense. 
-
+that over the years - they are strong in defense.
 ```{r}
 
+# ------------------------------------------------------------------
+# Part 1: Average Statistics of the teams in Big 10
+# ------------------------------------------------------------------
 # prepare the required data for plotting the data
 plot_data <- Big_10_data_frame
 
-# Since Big-10 is strong in the defense- we select the data that is 
+# Since Big-10 is strong in the defense- we select the data that is
 # defense and positive from Big-10 conference.
 plot_data <- filter(
   Big_10_data_frame,
@@ -239,13 +243,148 @@ plot_data <- plot_data %>%
   summarise(Avg_Stat_Val = mean(Big.Ten.statValue))
 
 
+
 # perform plotting of the data into a horizontal column chart
 # colored by team name.
 # Arranged by top scoring team at the top
-plot_data  %>%  mutate(Big.Ten.team.x = fct_reorder(Big.Ten.team.x, Avg_Stat_Val)) %>% 
-ggplot( aes(y = Big.Ten.team.x, x = Avg_Stat_Val, fill = Big.Ten.team.x)) +
-  geom_col()
+p <- plot_data  %>%  mutate(Big.Ten.team.x =
+                              fct_reorder(Big.Ten.team.x, Avg_Stat_Val)) %>%
+  ggplot(aes(y = Big.Ten.team.x, x = Avg_Stat_Val, fill = Big.Ten.team.x)) +
+  geom_col() +
+  labs(title = "Plot of Big Ten Teams with their Average statValues",
+       x = "Average Statistic Values",
+       y = "Big 10 Teams",
+       fill = "Big 10 Teams")
+
+
+
+# Create a common theme for all plots
+theme_common <- theme(
+  plot.title = element_text(size = 20, hjust = 0.5, margin = margin(
+      b = -0.1, t = 0.4, l = 2, unit = "cm") ),
+  legend.title = element_text(hjust = 0.4 , vjust = 0.3, size = 10),
+  plot.background = element_rect(fill = "#f5f5f2", color = NA),
+  panel.background = element_rect(fill = "#f5f5f2", color = NA),
+  legend.background = element_rect(fill = "#f5f5f2", color = NA)
+)
+
+p + theme_common
+# ------------------------------------------------------------------
+# Part 2: Display of the team statistics in the form of map
+# ------------------------------------------------------------------
+#
+# reinitialize the dataframe to prepare for the map data
+# Collect the required values from the Big_10_data_frame
+# summarize the values by teams
+plot_data <- NULL
+plot_data <- filter(
+  Big_10_data_frame,
+  Big.Ten.OffenseDefenseSpTeams == "Defense" &
+    Big.Ten.positivenegative == "positive"
+) %>%
+  group_by(Big.Ten.team.x) %>%
+  summarise(value = mean(Big.Ten.statValue))
+
+# Create a separate column with the heading as
+# region to get the states to map
+plot_data <- plot_data %>%
+  mutate(region = Big.Ten.team.x) %>%
+  arrange(desc(value))
+
+
+# cleanup the state names(region) based on the data collected data
+plot_data <- mutate(plot_data, region = fct_recode(region, Ohio = "Ohio State"))
+plot_data <- mutate(plot_data, region = fct_recode(region, Pennsylvania = "Penn State"))
+plot_data <- mutate(plot_data, region = fct_recode(region, Michigan = "Michigan State"))
+plot_data <- mutate(plot_data, region = fct_recode(region, Indiana = "Purdue"))
+plot_data <- mutate(plot_data, region = fct_recode(region, Illinois = "Northwestern"))
+plot_data <- mutate(plot_data, region = fct_recode(region, `New Jersey` = "Rutgers"))
+
+
+# convert the state names to lower cases to enable plotting
+# Summarize the data to be consolidated based on states instead of universities.
+plot_data <- plot_data %>% group_by(region) %>%
+  summarise(value = sum(value)) %>%
+  mutate(region = tolower(region))
+
+
+# show the list of states that are involved in the Big 10 Conferences
+# Creating a different visualization of average statValues across Big 10 Conferences
+# Apply the common theme
+# choropleth map zooming to the specific states that we are interested in
+state_choropleth(plot_data,
+                 zoom = c("ohio","wisconsin",
+                          "iowa","pennsylvania",
+                          "michigan","indiana",
+                          "illinois","minnesota",
+                          "nebraska",
+                          "maryland","new jersey"),
+                 title = "Big 10 Conference States",
+                 legend = "Average StatValue") +
+  theme_common
+
+# ------------------------------------------------------------------
+# Part 3: Trend of the teams over the years
+# ------------------------------------------------------------------
+# compare the average statistics for each team over the years - to get
+# the historical raise and fall of the teams.
+
+plot_data <- NULL
+# prepare the required data for plotting the data
+plot_data <- Big_10_data_frame
+
+# Since Big-10 is strong in the defense- we select the data that is
+# defense and positive from Big-10 conference.
+plot_data <- filter(
+  Big_10_data_frame,
+  Big.Ten.OffenseDefenseSpTeams == "Defense" &
+    Big.Ten.positivenegative == "positive"
+)
+
+# Now group the data according to team to get the summary statistics
+# and prepare the summarized data
+# Collect the mean/average of the statValue
+# arranged by team name over the years.
+plot_data <- plot_data %>%
+  group_by(Big.Ten.team.x, Big.Ten.year) %>%
+  summarise(Avg_Stat_Val = mean(Big.Ten.statValue))
+
+
+# plot the data for each team over the years - so that we
+# know the trend about the teams
+p <- ggplot(data = plot_data,
+         aes(x = Big.Ten.team.x, y = Avg_Stat_Val,  stat = "identity", fill = Big.Ten.year)) +
+       geom_bar(stat = "identity", position = position_dodge(), alpha = 0.75) +
+    geom_text(aes(label = round(Avg_Stat_Val)), vjust = 1.5,
+              position = position_dodge(width = .9), size = 3, color = "black", fontface = "italic") +
+    facet_grid(cols = vars(Big.Ten.year)) +
+    labs(title = "Plot of Big Ten Teams over the years",
+       x = "Average Statistic Values",
+       y = "Big 10 Teams",
+       fill = "Years") +
+    scale_fill_brewer(palette = "Dark2") +
+    theme(plot.title = element_text(size = 20, face = "bold.italic"),
+      axis.text.x = element_text(angle = 90, face = "bold.italic", size = 10, vjust = 0.75, hjust = 1),
+          axis.title = element_text(size = 14, face = "italic"),
+          axis.text.y = element_text(face = "bold.italic", size = 10),
+          panel.grid.minor = element_blank(),
+          panel.grid.major = element_blank())
+
+# Save the plot to a file
+ggsave(filename = "Indi_Years.png", plot = p, width = 10, height = 6, units = "in")
+
+# perform plotting of the data into a horizontal column chart
+# colored by team name.
+# Arranged by top scoring team at the top
+plot_data  %>%  mutate(Big.Ten.team.x =
+                              fct_reorder(Big.Ten.team.x, Avg_Stat_Val)) %>%
+  ggplot(aes(y = Big.Ten.team.x, x = Avg_Stat_Val, fill = Big.Ten.team.x)) +
+  geom_col() +
+  labs(title = "Plot of Big Ten Teams with their Average statValues",
+       x = "Average Statistic Values",
+       y = "Big 10 Teams",
+       fill = "Big 10 Teams")
+
 
 
 ```
-

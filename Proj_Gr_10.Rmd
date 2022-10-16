@@ -171,6 +171,45 @@ for (outer_loop_idx in 1:length(list_by_statName)) {
 ```
 
 
+# Filtered Data According to Conference
+```{r}
+
+# Select only the five conferences that we are interested in
+final_merged_conf_df <-
+  filter(
+    final_merged_df,
+    conference.x == "Big Ten" |
+      conference.x == "Big 12" |
+      conference.x == "ACC" |
+      conference.x == "Pac-12" |
+      conference.x == "SEC"
+  )
+# select the years that we are interested in
+# discard the year 2020 - since there is inconsistency in the number
+# of games played by each team
+final_merged_conf_df <-
+  filter(
+    final_merged_conf_df,
+    season == "2017" |
+      season == "2018" |
+      season == "2019" |
+      season == "2021"
+  )
+# split the refined dataframe according to the conferences
+conference_df_sorted_list <-
+  split(final_merged_conf_df, final_merged_conf_df$conference.x)
+
+# Save the list to separate conference dataframes for plotting.
+ACC_data_frame <- as.data.frame(conference_df_sorted_list["ACC"])
+Big_10_data_frame <-
+  as.data.frame(conference_df_sorted_list["Big Ten"])
+Big_12_data_frame <-
+  as.data.frame(conference_df_sorted_list["Big 12"])
+Pac_12_data_frame <-
+  as.data.frame(conference_df_sorted_list["Pac-12"])
+SEC_data_frame <- as.data.frame(conference_df_sorted_list["SEC"])
+
+```
 
 
 
@@ -221,6 +260,32 @@ qplot(x = whole_list_df[[1]]$statValue,
   theme_minimal()
 
 
+# https://www.statology.org/scatterplot-with-regression-line-r/
+#create some fake data
+data <- data.frame(x = c(1, 1, 2, 3, 4, 4, 5, 6, 7, 7, 8, 9, 10, 11, 11),
+                   y = c(13, 14, 17, 12, 23, 24, 25, 25, 24, 28, 32, 33, 35, 40, 41))
+
+#create scatterplot of data
+plot(data$x, data$y)
+
+model <-  lm(y ~ x, data = data)
+abline(model)
+
+#define range of x values
+newx = seq(min(data$x),max(data$x),by = 1)
+
+#find 95% confidence interval for the range of x values
+conf_interval <- predict(model, newdata=data.frame(x=newx), interval="confidence",
+                         level = 0.95)
+
+#create scatterplot of values with regression line
+plot(data$x, data$y)
+abline(model)
+
+#add dashed lines (lty=2) for the 95% confidence interval
+lines(newx, conf_interval[,2], col="blue", lty=2)
+lines(newx, conf_interval[,3], col="blue", lty=2)
+
 ```
 
 # Filtering of Data - Jen's Method
@@ -260,168 +325,7 @@ ggplot( aes(y = team.x, x = Avg_Stat_Val, fill = team.x)) +
 
 ```
 
-# Filtered Data According to Conference
-```{r}
 
-# Select only the five conferences that we are interested in
-final_merged_conf_df <-
-  filter(
-    final_merged_df,
-    conference.x == "Big Ten" |
-      conference.x == "Big 12" |
-      conference.x == "ACC" |
-      conference.x == "Pac-12" |
-      conference.x == "SEC"
-  )
-# select the years that we are interested in 
-# discard the year 2020 - since there is inconsistency in the number 
-# of games played by each team
-final_merged_conf_df <-
-  filter(
-    final_merged_conf_df,
-    season == "2017" |
-      season == "2018" |
-      season == "2019" |
-      season == "2021"
-  )
-# split the refined dataframe according to the conferences
-conference_df_sorted_list <-
-  split(final_merged_conf_df, final_merged_conf_df$conference.x)
-
-# Save the list to separate conference dataframes for plotting.
-ACC_data_frame <- as.data.frame(conference_df_sorted_list["ACC"])
-Big_10_data_frame <-
-  as.data.frame(conference_df_sorted_list["Big Ten"])
-Big_12_data_frame <-
-  as.data.frame(conference_df_sorted_list["Big 12"])
-Pac_12_data_frame <-
-  as.data.frame(conference_df_sorted_list["Pac-12"])
-SEC_data_frame <- as.data.frame(conference_df_sorted_list["SEC"])
-
-```
-
-
-
-Regression trial
-```{r}
-# https://www.statology.org/scatterplot-with-regression-line-r/
-#create some fake data
-data <- data.frame(x = c(1, 1, 2, 3, 4, 4, 5, 6, 7, 7, 8, 9, 10, 11, 11),
-                   y = c(13, 14, 17, 12, 23, 24, 25, 25, 24, 28, 32, 33, 35, 40, 41))
-
-#create scatterplot of data
-plot(data$x, data$y)
-
-model <-  lm(y ~ x, data = data)
-abline(model)
-
-#define range of x values
-newx = seq(min(data$x),max(data$x),by = 1)
-
-#find 95% confidence interval for the range of x values 
-conf_interval <- predict(model, newdata=data.frame(x=newx), interval="confidence",
-                         level = 0.95)
-
-#create scatterplot of values with regression line 
-plot(data$x, data$y)
-abline(model)
-
-#add dashed lines (lty=2) for the 95% confidence interval
-lines(newx, conf_interval[,2], col="blue", lty=2)
-lines(newx, conf_interval[,3], col="blue", lty=2)
-
-```
-
-
-# Josie's new stuff
-```{r}
-# Create a data frame that will have the info from team_record_df and the info 
-# from cfbstats_df (with each stat as its own column)
-team_record_df_expanded <- team_record_df
-team_record_df_expanded["rushingAttempts"] <- NA
-team_record_df_expanded["interceptionTDs"] <- NA
-team_record_df_expanded["passCompletions"] <- NA
-team_record_df_expanded["interceptions"] <- NA
-team_record_df_expanded["tacklesForLoss"] <- NA
-team_record_df_expanded["rushingYards"] <- NA
-team_record_df_expanded["penaltyYards"] <- NA
-team_record_df_expanded["kickReturnYards"] <- NA
-team_record_df_expanded["kickReturnTDs"] <- NA
-team_record_df_expanded["totalYards"] <- NA
-team_record_df_expanded["fumblesRecovered"] <- NA
-team_record_df_expanded["fumblesLost"] <- NA
-team_record_df_expanded["games"] <- NA
-team_record_df_expanded["puntReturns"] <- NA
-team_record_df_expanded["penalties"] <- NA
-team_record_df_expanded["fourthDowns"] <- NA
-team_record_df_expanded["rushingTDs"] <- NA
-team_record_df_expanded["netPassingYards"] <- NA
-team_record_df_expanded["turnovers"] <- NA
-team_record_df_expanded["possessionTime"] <- NA
-team_record_df_expanded["thirdDownConversions"] <- NA
-team_record_df_expanded["puntReturnTDs"] <- NA
-team_record_df_expanded["sacks"] <- NA
-team_record_df_expanded["interceptionYards"] <- NA
-team_record_df_expanded["passAttempts"] <- NA
-team_record_df_expanded["firstDowns"] <- NA
-team_record_df_expanded["puntReturnYards"] <- NA
-team_record_df_expanded["passingTDs"] <- NA
-team_record_df_expanded["fourthDownConversions"] <- NA
-team_record_df_expanded["passesIntercepted"] <- NA
-team_record_df_expanded["kickReturns"] <- NA
-team_record_df_expanded["thirdDowns"] <- NA
-
-# Iterate through cfbstats_df and fill in the appropriate row with that stat's 
-# information (matching based on team and year)
-for (i in 1:nrow(cfbstats_df))
-{
-    tmp <- cfbstats_df[i,]
-    team_record_df_expanded[team_record_df_expanded$team == tmp$team & 
-        team_record_df_expanded$year == tmp$season,][grep(tmp$statName, 
-        names(team_record_df_expanded))] <- tmp$statValue
-}
-
-# Create a simple linear regression based on all of the statistics, on total wins
-linear_regression = lm(total.wins ~ firstDowns + 
-                fourthDownConversions +
-                fourthDowns +
-                fumblesLost +
-                fumblesRecovered +
-                games +
-                interceptions +
-                interceptionTDs + 
-                interceptionYards +
-                kickReturns +
-                kickReturnTDs +
-                kickReturnYards +
-                netPassingYards +
-                passAttempts +
-                passCompletions + 
-                passesIntercepted +
-                passingTDs +
-                penalties +
-                penaltyYards +
-                possessionTime +
-                puntReturns +
-                puntReturnTDs +
-                puntReturnYards +
-                rushingAttempts +
-                rushingTDs +
-                rushingYards +
-                sacks +
-                tacklesForLoss +
-                thirdDownConversions +
-                thirdDowns +
-                totalYards +
-                turnovers, data = team_record_df_expanded)
-
-# Analyze the regression - summary shows good details on the 
-# significance of each variable
-plot(linear_regression)
-summary(linear_regression)
-anova(linear_regression)
-
-```
 
 
 
@@ -554,6 +458,9 @@ Big 10 is strong in the defense and here in this section we are trying to prove
 that over the years - they are strong in defense. 
 ```{r}
 
+# ------------------------------------------------------------------
+# Part 1: Average Statistics of the teams in Big 10
+# ------------------------------------------------------------------
 # prepare the required data for plotting the data
 plot_data <- Big_10_data_frame
 
@@ -574,6 +481,7 @@ plot_data <- plot_data %>%
   summarise(Avg_Stat_Val = mean(Big.Ten.statValue))
 
 
+
 # perform plotting of the data into a horizontal column chart
 # colored by team name.
 # Arranged by top scoring team at the top
@@ -589,41 +497,20 @@ p <- plot_data  %>%  mutate(Big.Ten.team.x =
 
 
 # Create a common theme for all plots
-theme_val <- theme(
-  plot.title = element_text(
-    size = 20,
-    hjust = 0.5,
-    margin = margin(
-      b = -0.1,
-      t = 0.4,
-      l = 2,
-      unit = "cm"
-    )
-  ),
-  legend.title = element_text(
-    hjust = 0.4 ,
-    vjust = 0.3,
-    size = 10
-  ),
+theme_common <- theme(
+  plot.title = element_text(size = 20, hjust = 0.5, margin = margin(
+      b = -0.1, t = 0.4, l = 2, unit = "cm") ),
+  legend.title = element_text(hjust = 0.4 , vjust = 0.3, size = 10),
   plot.background = element_rect(fill = "#f5f5f2", color = NA),
   panel.background = element_rect(fill = "#f5f5f2", color = NA),
   legend.background = element_rect(fill = "#f5f5f2", color = NA)
 )
 
-p + theme_val
-# ---------------------------------
-
-# TODO: Pending tasks:
-# 1. change the coloring theme for the unselected states to be in grey
-# 1a. change the legend title for the plot - if possible implement using the 
-# qplot()
-# 2. create a multiple plot for each years - just to get a feel of how
-# teams are doing over the years
-# 3. Creation of a dashboard consolidation every statistics into a single plot
-# 4. sort of a tornado plot? cylindrical histogram?
-# 5. Adjustment to the function and opportunity to create a 
-# new function by itself
-
+p + theme_common
+# ------------------------------------------------------------------
+# Part 2: Display of the team statistics in the form of map
+# ------------------------------------------------------------------
+#
 # reinitialize the dataframe to prepare for the map data
 # Collect the required values from the Big_10_data_frame
 # summarize the values by teams
@@ -659,16 +546,9 @@ plot_data <- plot_data %>% group_by(region) %>%
   mutate(region = tolower(region))
 
 
-# show the list of states that are invovled in the Big 10 Conferences
+# show the list of states that are involved in the Big 10 Conferences
 # Creating a different visualization of average statValues across Big 10 Conferences
 # Apply the common theme
-state_choropleth(plot_data,
-                 title = "Big 10 Conference States",
-                 legend = "Average StatValue") +
-  theme_val
-
-
-  
 # choropleth map zooming to the specific states that we are interested in
 state_choropleth(plot_data, 
                  zoom = c("ohio","wisconsin",
@@ -676,7 +556,74 @@ state_choropleth(plot_data,
                           "michigan","indiana",
                           "illinois","minnesota",
                           "nebraska",
-                          "maryland","new jersey"))
+                          "maryland","new jersey"),
+                 title = "Big 10 Conference States",
+                 legend = "Average StatValue") +
+  theme_common
+
+# ------------------------------------------------------------------
+# Part 3: Trend of the teams over the years
+# ------------------------------------------------------------------
+# compare the average statistics for each team over the years - to get 
+# the historical raise and fall of the teams.
+
+plot_data <- NULL
+# prepare the required data for plotting the data
+plot_data <- Big_10_data_frame
+
+# Since Big-10 is strong in the defense- we select the data that is
+# defense and positive from Big-10 conference.
+plot_data <- filter(
+  Big_10_data_frame,
+  Big.Ten.OffenseDefenseSpTeams == "Defense" &
+    Big.Ten.positivenegative == "positive"
+)
+
+# Now group the data according to team to get the summary statistics
+# and prepare the summarized data
+# Collect the mean/average of the statValue
+# arranged by team name over the years.
+plot_data <- plot_data %>%
+  group_by(Big.Ten.team.x, Big.Ten.year) %>%
+  summarise(Avg_Stat_Val = mean(Big.Ten.statValue))
+
+
+# plot the data for each team over the years - so that we
+# know the trend about the teams
+p <- ggplot(data = plot_data, 
+         aes(x = Big.Ten.team.x, y = Avg_Stat_Val,  stat = "identity", fill = Big.Ten.year)) + 
+       geom_bar(stat = "identity", position = position_dodge(), alpha = 0.75) +
+    geom_text(aes(label = round(Avg_Stat_Val)), vjust = 1.5,
+              position = position_dodge(width = .9), size = 3, color = "black", fontface = "italic") +
+    facet_grid(cols = vars(Big.Ten.year)) + 
+    labs(title = "Plot of Big Ten Teams over the years",
+       x = "Average Statistic Values",
+       y = "Big 10 Teams",
+       fill = "Years") + 
+    scale_fill_brewer(palette = "Dark2") + 
+    theme(plot.title = element_text(size = 20, face = "bold.italic"),
+      axis.text.x = element_text(angle = 90, face = "bold.italic", size = 10, vjust = 0.75, hjust = 1), 
+          axis.title = element_text(size = 14, face = "italic"),
+          axis.text.y = element_text(face = "bold.italic", size = 10),
+          panel.grid.minor = element_blank(),
+          panel.grid.major = element_blank())
+
+# Save the plot to a file
+ggsave(filename = "Indi_Years.png", plot = p, width = 10, height = 6, units = "in")
+
+# perform plotting of the data into a horizontal column chart
+# colored by team name.
+# Arranged by top scoring team at the top
+plot_data  %>%  mutate(Big.Ten.team.x =
+                              fct_reorder(Big.Ten.team.x, Avg_Stat_Val)) %>%
+  ggplot(aes(y = Big.Ten.team.x, x = Avg_Stat_Val, fill = Big.Ten.team.x)) +
+  geom_col() +
+  labs(title = "Plot of Big Ten Teams with their Average statValues",
+       x = "Average Statistic Values",
+       y = "Big 10 Teams",
+       fill = "Big 10 Teams")
+
+
 
 ```
 
