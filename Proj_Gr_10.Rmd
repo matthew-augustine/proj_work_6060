@@ -1,0 +1,682 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+
+
+# Load the libraries
+```{r}
+library(readr)
+library(ggplot2)
+suppressPackageStartupMessages(library(dplyr))
+library(forcats)
+library(reshape2)
+suppressPackageStartupMessages(library(choroplethr))
+library(choroplethrMaps)
+library(datasets)
+```
+
+
+# Reading the data & cleaning data
+
+```{r}
+# reading data from the csv files
+team_record_df <-
+  read_csv("Team Records.csv", show_col_types = FALSE)
+# reading data of the statistics
+cfbstats_df <- read_csv("cfbstats.csv", show_col_types = FALSE)
+# reading data of the stat mapping
+stat_mapping_df <-
+  read_csv("Stat Mapping.csv", show_col_types = FALSE)
+
+
+# Data Cleaning
+# remove unwanted columns from the data
+team_record_df <- team_record_df %>%
+  select(-expectedWins) %>%
+  select(-total.games) %>%
+  select(-total.ties) %>%
+  select(-conferenceGames.games) %>%
+  select(-conferenceGames.wins) %>%
+  select(-conferenceGames.losses) %>%
+  select(-conferenceGames.ties) %>%
+  select(-homeGames.games) %>%
+  select(-homeGames.ties) %>%
+  select(-awayGames.games) %>%
+  select(-awayGames.ties)
+
+
+# data cleaning of team_record_df
+team_record_df <-  team_record_df %>%
+  mutate(year = as.factor(year)) %>%
+  mutate(team = as.factor(team)) %>%
+  mutate(conference = as.factor(conference)) %>%
+  mutate(total.wins = as.integer(total.wins)) %>%
+  mutate(total.losses = as.integer(total.losses)) %>%
+  mutate(homeGames.wins = as.integer(homeGames.wins)) %>%
+  mutate(homeGames.losses = as.integer(homeGames.losses)) %>%
+  mutate(awayGames.wins = as.integer(awayGames.wins)) %>%
+  mutate(awayGames.losses = as.integer(awayGames.losses))
+
+
+# data cleaning of cfbstats_df
+cfbstats_df <- cfbstats_df %>%
+  mutate(season = as.factor(season)) %>%
+  mutate(team = as.factor(team)) %>%
+  mutate(statName = as.factor(statName)) %>%
+  mutate(conference = as.factor(conference))
+
+# data cleaning of Stat Mapping
+stat_mapping_df <- stat_mapping_df %>%
+  mutate(statName = as.factor(statName)) %>%
+  mutate(OffenseDefenseSpTeams = as.factor(OffenseDefenseSpTeams)) %>%
+  mutate(positivenegative = as.factor(positivenegative))
+
+
+
+# Create a mapping between team_record and cfbstats table through a
+# customized lookup value
+
+# Construct a lookup column - which is combination of year and team name
+# from team_record_df
+# Example: '2021 Michigan'
+team_record_df <- team_record_df %>%
+  mutate(cfb_lookup = paste(team_record_df$year,  team_record_df$team))
+
+# Construct a lookup column - which is combination of season and team value
+# from cfbstats_df
+# Example: '2021 Michigan'
+cfbstats_df <- cfbstats_df %>%
+  mutate(cfb_lookup = paste(cfbstats_df$season, cfbstats_df$team))
+
+# Merge the data frames based on cfb_lookup values
+merge_team_cfb <-
+  merge(cfbstats_df, team_record_df, by = "cfb_lookup")
+
+
+# Now merge merge_team_cfb and stat_mapping_df
+# This final data would be used for further processing
+# Merge the data frames based on statName values
+final_merged_df <-
+  merge(merge_team_cfb, stat_mapping_df, by = "statName")
+
+
+write_csv(final_merged_df, "temp2.csv")
+
+# Splitting of the dataframe to smaller lists
+
+# split the data to a list of dataframes - based on statName
+list_by_statName <- split(final_merged_df, final_merged_df$statName)
+
+
+
+
+
+
+# ******************************************************************************
+# Function: append_list
+#
+# Purpose: The purpose of the function is to
+#          extract each dataframe from the list and
+#          sort the data based on statValue
+#          Create a column in the dataframe - RankVal and assign the ranking values
+#
+# Input : list_by_statName_year_b (list of dataframes)
+#
+# Output: Returns the list of modified dataframes
+# ******************************************************************************
+
+# Creating a function which creates a column RankVal
+# and append to the whole_list_df
+append_list <- function(list_by_statName_year_b) {
+  # Assign Rank Values for each year
+  # based on the descending order of statValues
+  for (inner_loop_idx in 1:length(list_by_statName_year_b)) {
+    list_by_statName_year_b[[inner_loop_idx]] <-
+      list_by_statName_year_b[[inner_loop_idx]] %>%
+      mutate(RankVal =
+               rank(desc(list_by_statName_year_b[[inner_loop_idx]]$statValue))) %>%
+      arrange(RankVal)
+  }
+  
+  return (list_by_statName_year_b)
+}
+
+# Create an empty list to collect all processed data
+whole_list_df <- list()
+
+# Create a loop - which goes through all entries in list based on statName
+for (outer_loop_idx in 1:length(list_by_statName)) {
+  # Since the list contains data for many years(2017-2021)
+  # split the list further based on year
+  list_by_statName_year_a <-
+    split(list_by_statName[[outer_loop_idx]],
+          list_by_statName[[outer_loop_idx]]$year)
+  
+  # Collect the return value from the function to a temporary list
+  temp_list <- append_list(list_by_statName_year_a)
+  
+  # Collect the data from the list returned from the function 
+  whole_list_df[[length(whole_list_df) + 1]] <- temp_list[[1]]
+  whole_list_df[[length(whole_list_df) + 1]] <- temp_list[[2]]
+  whole_list_df[[length(whole_list_df) + 1]] <- temp_list[[3]]
+  whole_list_df[[length(whole_list_df) + 1]] <- temp_list[[4]]
+  whole_list_df[[length(whole_list_df) + 1]] <- temp_list[[5]]
+  
+}
+
+```
+
+
+
+
+
+
+# TEMP SECTION - helper statements
+TODO: This section onwards - we need to select 
+what should be plotted and analyzed.
+```{r}
+# this captures the entire list(whole_list_df) into a text document
+# where we can verify the data
+# since the whole_list_df is not a dataframe, we cannot export to excel
+capture.output((whole_list_df), file = "temp2.txt")
+
+
+# Accessing the statValue column from the 1st entry of the 
+# list - which is the entry for '2017 - firstDowns'
+print(whole_list_df[[1]]$statValue)
+
+# Sample plotting of graph
+# we could pick the required dataframe to 
+# a separate dataframe for plotting - like this
+plot_df <- whole_list_df[[1]]
+write_csv(plot_df, file = "temp1.csv")
+qplot(x = statValue, data = plot_df, geom = "histogram")
+
+qplot(y = statValue, x = total.wins, data = plot_df, geom = c("point", "line"))
+
+
+
+# or alternatively, we could directly access 
+# from the qplot statements
+qplot(x = whole_list_df[[1]]$statValue, 
+      data = whole_list_df[[1]], geom = "histogram")
+
+
+# Plot of Homegame wins and Away Games Wins
+  qplot(x = awayGames.wins,
+     y = homeGames.wins,
+     data = final_merged_df, 
+     geom = "point") + 
+  geom_point(shape = "square", size = 1.5, colour = "#112446") +
+  scale_fill_hue(direction = 1) +
+  labs(
+    x = "Away Games Wins",
+    y = "Home Game Wins",
+    title = "Home Game and Away Games Wins"
+  ) +
+  theme_minimal()
+
+
+```
+
+# Filtering of Data - Jen's Method
+
+```{r}
+# converted the full list of list to data frame
+all_df <- data.frame(Reduce(rbind, whole_list_df))
+ACCSEC_df <- filter(all_df, conference.x == "Big Ten" )
+ACCSEC_df <- ACCSEC_df %>% filter(season == "2017" |
+                                    season == "2018" | 
+                                    season == "2019" |
+                                    season == "2021")
+
+names(ACCSEC_df)
+plot_data <- filter(
+  ACCSEC_df,
+  OffenseDefenseSpTeams == "Defense" &
+    positivenegative == "positive"
+)
+
+# Now group the data according to team to get the summary statistics
+# and prepare the summarized data
+# Collect the mean/average of the statValue
+# arranged by team name over the years.
+plot_data <- plot_data %>% 
+  group_by(team.x) %>% 
+  summarise(Avg_Stat_Val = mean(statValue))
+
+# perform plotting of the data into a horizontal column chart
+# colored by team name.
+# Arranged by top scoring team at the top
+plot_data  %>%  mutate(team.x = fct_reorder(team.x, Avg_Stat_Val)) %>% 
+ggplot( aes(y = team.x, x = Avg_Stat_Val, fill = team.x)) +
+  geom_col()
+
+
+
+```
+
+# Filtered Data According to Conference
+```{r}
+
+# Select only the five conferences that we are interested in
+final_merged_conf_df <-
+  filter(
+    final_merged_df,
+    conference.x == "Big Ten" |
+      conference.x == "Big 12" |
+      conference.x == "ACC" |
+      conference.x == "Pac-12" |
+      conference.x == "SEC"
+  )
+# select the years that we are interested in 
+# discard the year 2020 - since there is inconsistency in the number 
+# of games played by each team
+final_merged_conf_df <-
+  filter(
+    final_merged_conf_df,
+    season == "2017" |
+      season == "2018" |
+      season == "2019" |
+      season == "2021"
+  )
+# split the refined dataframe according to the conferences
+conference_df_sorted_list <-
+  split(final_merged_conf_df, final_merged_conf_df$conference.x)
+
+# Save the list to separate conference dataframes for plotting.
+ACC_data_frame <- as.data.frame(conference_df_sorted_list["ACC"])
+Big_10_data_frame <-
+  as.data.frame(conference_df_sorted_list["Big Ten"])
+Big_12_data_frame <-
+  as.data.frame(conference_df_sorted_list["Big 12"])
+Pac_12_data_frame <-
+  as.data.frame(conference_df_sorted_list["Pac-12"])
+SEC_data_frame <- as.data.frame(conference_df_sorted_list["SEC"])
+
+```
+
+
+
+Regression trial
+```{r}
+# https://www.statology.org/scatterplot-with-regression-line-r/
+#create some fake data
+data <- data.frame(x = c(1, 1, 2, 3, 4, 4, 5, 6, 7, 7, 8, 9, 10, 11, 11),
+                   y = c(13, 14, 17, 12, 23, 24, 25, 25, 24, 28, 32, 33, 35, 40, 41))
+
+#create scatterplot of data
+plot(data$x, data$y)
+
+model <-  lm(y ~ x, data = data)
+abline(model)
+
+#define range of x values
+newx = seq(min(data$x),max(data$x),by = 1)
+
+#find 95% confidence interval for the range of x values 
+conf_interval <- predict(model, newdata=data.frame(x=newx), interval="confidence",
+                         level = 0.95)
+
+#create scatterplot of values with regression line 
+plot(data$x, data$y)
+abline(model)
+
+#add dashed lines (lty=2) for the 95% confidence interval
+lines(newx, conf_interval[,2], col="blue", lty=2)
+lines(newx, conf_interval[,3], col="blue", lty=2)
+
+```
+
+
+# Josie's new stuff
+```{r}
+# Create a data frame that will have the info from team_record_df and the info 
+# from cfbstats_df (with each stat as its own column)
+team_record_df_expanded <- team_record_df
+team_record_df_expanded["rushingAttempts"] <- NA
+team_record_df_expanded["interceptionTDs"] <- NA
+team_record_df_expanded["passCompletions"] <- NA
+team_record_df_expanded["interceptions"] <- NA
+team_record_df_expanded["tacklesForLoss"] <- NA
+team_record_df_expanded["rushingYards"] <- NA
+team_record_df_expanded["penaltyYards"] <- NA
+team_record_df_expanded["kickReturnYards"] <- NA
+team_record_df_expanded["kickReturnTDs"] <- NA
+team_record_df_expanded["totalYards"] <- NA
+team_record_df_expanded["fumblesRecovered"] <- NA
+team_record_df_expanded["fumblesLost"] <- NA
+team_record_df_expanded["games"] <- NA
+team_record_df_expanded["puntReturns"] <- NA
+team_record_df_expanded["penalties"] <- NA
+team_record_df_expanded["fourthDowns"] <- NA
+team_record_df_expanded["rushingTDs"] <- NA
+team_record_df_expanded["netPassingYards"] <- NA
+team_record_df_expanded["turnovers"] <- NA
+team_record_df_expanded["possessionTime"] <- NA
+team_record_df_expanded["thirdDownConversions"] <- NA
+team_record_df_expanded["puntReturnTDs"] <- NA
+team_record_df_expanded["sacks"] <- NA
+team_record_df_expanded["interceptionYards"] <- NA
+team_record_df_expanded["passAttempts"] <- NA
+team_record_df_expanded["firstDowns"] <- NA
+team_record_df_expanded["puntReturnYards"] <- NA
+team_record_df_expanded["passingTDs"] <- NA
+team_record_df_expanded["fourthDownConversions"] <- NA
+team_record_df_expanded["passesIntercepted"] <- NA
+team_record_df_expanded["kickReturns"] <- NA
+team_record_df_expanded["thirdDowns"] <- NA
+
+# Iterate through cfbstats_df and fill in the appropriate row with that stat's 
+# information (matching based on team and year)
+for (i in 1:nrow(cfbstats_df))
+{
+    tmp <- cfbstats_df[i,]
+    team_record_df_expanded[team_record_df_expanded$team == tmp$team & 
+        team_record_df_expanded$year == tmp$season,][grep(tmp$statName, 
+        names(team_record_df_expanded))] <- tmp$statValue
+}
+
+# Create a simple linear regression based on all of the statistics, on total wins
+linear_regression = lm(total.wins ~ firstDowns + 
+                fourthDownConversions +
+                fourthDowns +
+                fumblesLost +
+                fumblesRecovered +
+                games +
+                interceptions +
+                interceptionTDs + 
+                interceptionYards +
+                kickReturns +
+                kickReturnTDs +
+                kickReturnYards +
+                netPassingYards +
+                passAttempts +
+                passCompletions + 
+                passesIntercepted +
+                passingTDs +
+                penalties +
+                penaltyYards +
+                possessionTime +
+                puntReturns +
+                puntReturnTDs +
+                puntReturnYards +
+                rushingAttempts +
+                rushingTDs +
+                rushingYards +
+                sacks +
+                tacklesForLoss +
+                thirdDownConversions +
+                thirdDowns +
+                totalYards +
+                turnovers, data = team_record_df_expanded)
+
+# Analyze the regression - summary shows good details on the 
+# significance of each variable
+plot(linear_regression)
+summary(linear_regression)
+anova(linear_regression)
+
+```
+
+
+
+# Monica's new code 1
+
+```{r}
+#Monica's charts
+#Total statValue to total wins color coded by conference (defensive stats only)
+#rename 'final_merged_df' to tmp
+tmp <- final_merged_df
+#filter by 2017
+year <- filter(tmp, season == "2017")
+#filter by Defense
+defense <- filter(year, OffenseDefenseSpTeams == "Defense")
+#change 'team.x' to as.factor (not sure if needed)
+tmp2 <- mutate(defense, team.x = as.factor(team.x))
+#group by team, total wins, and conference. Sum stats
+tmp3 <- tmp2 %>% group_by(team.x, total.wins, conference.x) %>%
+  summarise(across(c(statValue), sum))
+#plot
+p <- qplot(statValue, total.wins, data = tmp3, geom = "point", color = conference.x)
+
+#group by conference, stats, wins
+tmp4 <- tmp2 %>% group_by(conference.x) %>%
+  summarise(across(c(statValue, total.wins), sum))
+#plot
+p2 <- qplot(statValue, total.wins, data = tmp4, geom = "point", color = conference.x)
+
+```
+
+# Monica's new code 2
+```{r}
+#Monica's charts
+#Total statValue to total wins color coded by conference (defensive stats only)
+#rename 'final_merged_df' to tmp
+a <- final_merged_df
+#filter by 2017
+b <- filter(a, season == "2017")
+#filter by Defense
+c <- filter(b, OffenseDefenseSpTeams == "Offense")
+#group by team, total wins, and conference. Sum stats
+d <- c %>% group_by(team.x, total.wins, conference.x) %>%
+  summarise(across(c(statValue), sum))
+#plot
+p3 <- qplot(statValue, total.wins, data = tmp3, geom = "point", color = conference.x)
+
+#group by conference, stats, wins
+e <- c %>% group_by(conference.x) %>%
+  summarise(across(c(statValue, total.wins), sum))
+#plot
+qplot(statValue, total.wins, data = e, geom = "point", color = conference.x)
+
+```
+
+# Question: Offensive/Defensive Advantageous
+```{r}
+# collect the data from the final_merged_df
+tmp <- final_merged_df
+tmp1 <- NULL
+# perform group_by and get the statistics 
+tmp1 <- tmp %>% group_by(OffenseDefenseSpTeams) %>% 
+  summarise(win_ct = (n()/nrow(tmp)))
+
+# Get Ready to switch to Python
+library(reticulate)
+use_python("C:\\Python310")
+
+
+```
+## Python Implementation of pie chart
+```{python}
+# https://matplotlib.org/stable/gallery/pie_and_polar_charts/pie_features.html
+import numpy as np
+import matplotlib.pyplot as plt
+# Get the data from the r terminal - those labels
+labels = r.tmp1.OffenseDefenseSpTeams
+# Get the corresponding values - convert to %
+sizes = r.tmp1.win_ct * 100
+# adjust this value for pie chart to explode separate section
+explode = (0, 0.1, 0, 0) 
+fig1, ax1 = plt.subplots()
+# set the format in the pie chart
+ax1.pie(sizes, explode=explode, labels=labels, autopct='%1.1f%%', shadow=True, startangle=90)
+ax1.axis('equal') 
+# show the pie chart
+plt.show()
+
+```
+
+## R Implementation of pie chart
+```{r}
+
+x <- tmp1$win_ct
+labels <- tmp1$OffenseDefenseSpTeams
+piepercent<- round(100*x/sum(x), 1)
+# Plot the chart.
+pie(x, labels = piepercent, main = "Offensive/Defensive pie chart",col = rainbow(length(x))) 
+legend("topright", legend = labels, cex = 0.8, fill = rainbow(length(x)))
+
+# --------------------------------------------------------
+
+
+
+# backup pie chart in R terminal
+# https://r-graph-gallery.com/piechart-ggplot2.html
+ggplot(tmp1,
+       aes(x = "", y = win_ct, fill = OffenseDefenseSpTeams)) +
+  geom_bar(stat = "identity",
+           width = 1,
+           color = "white") +
+  coord_polar("y", start = 0) +
+  theme_void() 
+  
+
+
+#change 'team.x' to as.factor (not sure if needed)
+tmp2 <- mutate(defense, team.x = as.factor(team.x))
+#group by team, total wins, and conference. Sum stats
+tmp3 <- tmp2 %>% group_by(team.x, total.wins, conference.x) %>%
+  summarise(across(c(statValue), sum))
+#plot
+p <- qplot(statValue, total.wins, data = tmp3, geom = "point", color = conference.x)
+
+
+```
+
+# Analysis of Big 10
+
+Big 10 is strong in the defense and here in this section we are trying to prove
+that over the years - they are strong in defense. 
+```{r}
+
+# prepare the required data for plotting the data
+plot_data <- Big_10_data_frame
+
+# Since Big-10 is strong in the defense- we select the data that is
+# defense and positive from Big-10 conference.
+plot_data <- filter(
+  Big_10_data_frame,
+  Big.Ten.OffenseDefenseSpTeams == "Defense" &
+    Big.Ten.positivenegative == "positive"
+)
+
+# Now group the data according to team to get the summary statistics
+# and prepare the summarized data
+# Collect the mean/average of the statValue
+# arranged by team name over the years.
+plot_data <- plot_data %>%
+  group_by(Big.Ten.team.x) %>%
+  summarise(Avg_Stat_Val = mean(Big.Ten.statValue))
+
+
+# perform plotting of the data into a horizontal column chart
+# colored by team name.
+# Arranged by top scoring team at the top
+p <- plot_data  %>%  mutate(Big.Ten.team.x =
+                              fct_reorder(Big.Ten.team.x, Avg_Stat_Val)) %>%
+  ggplot(aes(y = Big.Ten.team.x, x = Avg_Stat_Val, fill = Big.Ten.team.x)) +
+  geom_col() +  
+  labs(title = "Plot of Big Ten Teams with their Average statValues",
+       x = "Average Statistic Values",
+       y = "Big 10 Teams",
+       fill = "Big 10 Teams")
+
+
+
+# Create a common theme for all plots
+theme_val <- theme(
+  plot.title = element_text(
+    size = 20,
+    hjust = 0.5,
+    margin = margin(
+      b = -0.1,
+      t = 0.4,
+      l = 2,
+      unit = "cm"
+    )
+  ),
+  legend.title = element_text(
+    hjust = 0.4 ,
+    vjust = 0.3,
+    size = 10
+  ),
+  plot.background = element_rect(fill = "#f5f5f2", color = NA),
+  panel.background = element_rect(fill = "#f5f5f2", color = NA),
+  legend.background = element_rect(fill = "#f5f5f2", color = NA)
+)
+
+p + theme_val
+# ---------------------------------
+
+# TODO: Pending tasks:
+# 1. change the coloring theme for the unselected states to be in grey
+# 1a. change the legend title for the plot - if possible implement using the 
+# qplot()
+# 2. create a multiple plot for each years - just to get a feel of how
+# teams are doing over the years
+# 3. Creation of a dashboard consolidation every statistics into a single plot
+# 4. sort of a tornado plot? cylindrical histogram?
+# 5. Adjustment to the function and opportunity to create a 
+# new function by itself
+
+# reinitialize the dataframe to prepare for the map data
+# Collect the required values from the Big_10_data_frame
+# summarize the values by teams
+plot_data <- NULL
+plot_data <- filter(
+  Big_10_data_frame,
+  Big.Ten.OffenseDefenseSpTeams == "Defense" &
+    Big.Ten.positivenegative == "positive"
+) %>%
+  group_by(Big.Ten.team.x) %>%
+  summarise(value = mean(Big.Ten.statValue))
+
+# Create a separate column with the heading as
+# region to get the states to map
+plot_data <- plot_data %>%
+  mutate(region = Big.Ten.team.x) %>%
+  arrange(desc(value))
+
+
+# cleanup the state names(region) based on the data collected data
+plot_data <- mutate(plot_data, region = fct_recode(region, Ohio = "Ohio State"))
+plot_data <- mutate(plot_data, region = fct_recode(region, Pennsylvania = "Penn State"))
+plot_data <- mutate(plot_data, region = fct_recode(region, Michigan = "Michigan State"))
+plot_data <- mutate(plot_data, region = fct_recode(region, Indiana = "Purdue"))
+plot_data <- mutate(plot_data, region = fct_recode(region, Illinois = "Northwestern"))
+plot_data <- mutate(plot_data, region = fct_recode(region, `New Jersey` = "Rutgers"))
+
+
+# convert the state names to lower cases to enable plotting
+# Summarize the data to be consolidated based on states instead of universities.
+plot_data <- plot_data %>% group_by(region) %>% 
+  summarise(value = sum(value)) %>% 
+  mutate(region = tolower(region))
+
+
+# show the list of states that are invovled in the Big 10 Conferences
+# Creating a different visualization of average statValues across Big 10 Conferences
+# Apply the common theme
+state_choropleth(plot_data,
+                 title = "Big 10 Conference States",
+                 legend = "Average StatValue") +
+  theme_val
+
+
+  
+# choropleth map zooming to the specific states that we are interested in
+state_choropleth(plot_data, 
+                 zoom = c("ohio","wisconsin",
+                          "iowa","pennsylvania",
+                          "michigan","indiana",
+                          "illinois","minnesota",
+                          "nebraska",
+                          "maryland","new jersey"))
+
+```
+
